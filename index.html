@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Race Technology — Evolução da Computação (2020–2025)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    html, body, #root { height: 100%; }
+  </style>
+  <!-- React 18 + ReactDOM from CDN -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <!-- Babel standalone to transpile JSX in-browser -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body class="bg-black text-white antialiased">
+  <div id="root"></div>
+
+  <script type="text/babel">
+
+    const { useMemo, useState } = React;
+
+    /**
+     * HexTech Board — versão estável
+     * - Corrige erros de string/template
+     * - Casas não se sobrepõem
+     * - Cor do dono aplicada ao preencher
+     * - Upgrade de aluguel (50 → 150) via quiz da própria casa
+     * - Em erro, mostra alternativa correta + explicação
+     */
+
+    // ----------------- Utilitários geométricos -----------------
+    const TAU = Math.PI * 2;
+    const deg = (a) => (a * Math.PI) / 180;
+    const hexVertices = (cx, cy, r) => Array.from({ length: 6 }, (_, k) => {
+      const a = deg(30 + k * 60);
+      return { x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) };
+    });
+    const lerp = (a, b, t) => a + (b - a) * t;
+    const sideAngle = (a, b) => Math.atan2(b.y - a.y, b.x - a.x);
+
+    // ----------------- Banco de dados -----------------
+    const THEMES = {
+      2020: { name: "IA Pessoal", color: "#29b6f6" },
+      2021: { name: "IA Pessoal", color: "#26a69a" },
+      2022: { name: "Computação Quântica", color: "#7e57c2" },
+      2023: { name: "Computação Quântica", color: "#ab47bc" },
+      2024: { name: "Tecnologias Emergentes", color: "#ff4081" },
+      2025: { name: "Tecnologias Emergentes", color: "#ffb300" },
+    };
+
+    const PROPERTY_SPEC = {
+      2020: [
+        { title: "DeepMind", q: "Qual foi o grande avanço que a DeepMind proporcionou, em 2020, através do sistema AlphaFold", opts: ["Criar imagens hiper-realistas com IA", "Prever estruturas de proteínas com alta precisão", "Controlar drones de forma autônoma", "Criar assistente virtual doméstica"], correct: 1, exp: "O AlphaFold, da DeepMind, é uma inteligência artificial que prevê a estrutura 3D de proteínas com alta precisão, acelerando a descoberta de novos medicamentos e a pesquisa em biologia." },
+        { title: "OpenAI", q: "Qual foi um dos maiores avanços em inteligência artificial lançado em 2020?", opts: ["GPT-3", "AlphaGo", "Watson", "Siri"], correct: 0, exp: "O GPT-3 foi lançado em 2020 e foi considerado um grande avanço no ramo de IA." },
+        { title: "Alexa", q: "O que 'palavra de ativação' (wake word) faz em assistentes de voz?", opts: ["Compacta modelos", "Dispara a escuta ativa", "Aumenta taxa de amostra", "Corrige ruído em RF"], correct: 1, exp: "A hotword local aciona a captura do comando completo." },
+        { title: "Gboard", q: "No aprendizado federado, os dados do usuário…", opts: ["são enviados ao servidor", "ficam no dispositivo", "são publicados anonimamente", "são destruídos"], correct: 1, exp: "Os dados ficam no aparelho; apenas gradientes chegam ao servidor." },
+        { title: "Vision Transformer", q: "Modelos baseados em transformers trouxeram…", opts: ["Vetores fixos", "Atenção contextual", "Somente CNNs", "Somente RNNs"], correct: 1, exp: "Atenção permite embeddings que dependem do contexto inteiro." },
+        { title: "Google", q: "Quem, em 2020, era o chefe do Google AI e se destacou por liderar grandes avanços em machine learning e IA?", opts: ["Jeff Dean", "Demis Hassabis", "Sundar Pichai", "Yann LeCun"], correct: 0, exp: "Jeff Dean coordenou pesquisas importantíssimas para os avanços em IA no Google'" },
+      ],
+      2021: [
+        { title: "HealthAI", q: "Em 2021, qual área da saúde se beneficiou do uso de chatbots e assistentes virtuais, com 39% dos pacientes interagindo com essas tecnologias?", opts: ["Cardiologia", "Dermatologia", "Ortopedia", "Saúde mental"], correct: 3, exp: "Em 2021, Chatbots foram amplamente utilizados para fornecer suporte psicológico aos pacientes." },
+        { title: "Anthropic", q: "Traduções modernas usam principalmente…", opts: ["Árvores sintáticas", "Transformers", "Regras fixas", "N‑gramas"], correct: 1, exp: "Transformers dominam MT por capturar dependências longas." },
+        { title: "Meta", q: "Para comandos por voz robustos em ruído, qual técnica ajuda?", opts: ["Data augmentation", "Dropout = 0", "Aprendizado sem rótulos", "Somente FFT"], correct: 0, exp: "Augmentations com ruído/reverberação melhoram robustez." },
+        { title: "AMP Robotics", q: "Sensores de smartphone para IA pessoal tipicamente incluem…", opts: ["Acelerômetro e giroscópio", "Sismógrafo", "Radar aéreo", "LIDAR automotivo"], correct: 0, exp: "IMUs permitem reconhecer gestos/atividades." },
+        { title: "Claude", q: "Qual tarefa produz versões curtas preservando sentido?", opts: ["Classificação", "Lematização", "Sumarização", "Tokenização"], correct: 2, exp: "A sumarização condensa mantendo ideias principais." },
+        { title: "Tesla", q: "Filtros de câmera com IA frequentemente usam…", opts: ["GANs e detecção facial", "Árvores de decisão", "SVM linear", "Regressão logística"], correct: 0, exp: "GANs geram estilos; detecção facial alinha a máscara." },
+      ],
+      2022: [
+        { title: "Dobslit", q: "Qubits supercondutores são operados em…", opts: ["Temperatura ambiente", "Temperaturas criogênicas", "Milhões de °C", "Vácuo a quente"], correct: 1, exp: "Criogenia reduz ruído térmico e preserva coerência." },
+        { title: "Quantum AI", q: "Portas X, H e CNOT pertencem a…", opts: ["Lógica clássica", "Circuitos quânticos", "Redes Bayesianas", "Autômatos celulares"], correct: 1, exp: "Portas fundamentais que manipulam estados quânticos." },
+        { title: "QODA", q: "Qual dessa empresas anunciou a plataforma QODA em 2022?", opts: ["Google", "Microsoft", "NVIDIA", "Intel"], correct: 2, exp: "A NVIDIA anunciou em 2022 a plataforma QODA que une computação clássica e quântica." },
+        { title: "Osprey", q: "Qual empresa lançou o processador quântico OSPREY?", opts: ["IBM", "NVIDIA", "Intel", "Google"], correct: 0, exp: "A IBM lançou o processador quântico OSPREY com 433 qubits, representando um grande avanço na computação quântica em 2022." },
+        { title: "Pasqal", q: "O que são qubits", opts: ["As unidades básicas de informação em computadores clássicos, podendo ser apenas 0 ou 1.", "As unidades fundamentais de informação em computação quântica, que podem estar em 0, 1 ou em uma superposição de ambos.", "Processadores especializados usados para rodar algoritmos quânticos.", "Memórias digitais usadas em computadores tradicionais para armazenar bits em discos rígidos."], correct: 1, exp: "Qubits são as unidades de informação da computação quântica, capazes de representar 0 e 1 simultaneamente graças ao fenômeno da superposição." },
+        { title: "QUIT", q: "Qual desses cientistas foi um dos premiados com o International Quantum Award em 2022?", opts: ["Jay Gambetta", "Jeremy O’Brien", "Pete Shadbolt", "Giacomo Mauro D’Ariano"], correct: 4, exp: "Giacomo Mauro D’Ariano foi o vencedor do prêmio internacional em 2022." },
+      ],
+      2023: [
+        { title: "IonQ", q: "Códigos de superfície servem para…", opts: ["Compressão", "Correção de erros quânticos", "Sombreamento 3D", "Hashing"], correct: 1, exp: "Protegem info quântica distribuindo‑a por muitos qubits." },
+        { title: "Intel", q: "QAOA é usado para…", opts: ["Classificação de imagens", "Otimização", "Renderização 3D", "Streaming"], correct: 1, exp: "Heurística híbrida para otimização combinatória." },
+        { title: "Microsoft", q: "Aumentar qubits sem fidelidade adequada leva a…", opts: ["Menos ruído", "Mais decoerência", "Menos latência", "Criptografia instantânea"], correct: 1, exp: "Mais qubits → mais erros acumulados sem QEC suficiente." },
+        { title: "Quantinuum", q: "Dispositivos NISQ são caracterizados por…", opts: ["Erro baixo e correção completa", "Ruído e poucas centenas de qubits", "Milhões estáveis", "Somente simulação"], correct: 1, exp: "Era de poucos qubits ruidosos sem QEC plena." },
+        { title: "Grover", q: "Algoritmo de Grover oferece ganho…", opts: ["Exponencial", "Quadrático", "Linear", "Nenhum"], correct: 1, exp: "Pesquisa não estruturada: O(N) → O(√N)." },
+        { title: "Venturus", q: "Criptografia pós‑quântica busca…", opts: ["Quebrar RSA", "Resistência a ataques quânticos", "Somente simétricas", "Eliminar TLS"], correct: 1, exp: "Novos esquemas (ex.: lattices) seguros mesmo com QPUs." },
+      ],
+      2024: [
+        { title: "Apple", q: "Qual tecnologia é básica para colaboração imersiva?", opts: ["CSV", "Realidade Virtual/Aumentada", "Telnet", "Fax"], correct: 1, exp: "VR/AR dá presença e interação espacial." },
+        { title: "HTC", q: "Arquiteturas neuromórficas imitam…", opts: ["Planetas", "Redes neurais biológicas", "Árvores", "Fractais"], correct: 1, exp: "Spiking/event‑driven inspirado em neurônios/sinapses." },
+        { title: "Samsung", q: "Modelos multimodais processam…", opts: ["Somente texto", "Texto, imagem, áudio, etc.", "Somente imagens", "Somente tabulares"], correct: 1, exp: "Integram sinais diferentes para raciocínio conjunto." },
+        { title: "Nano Brasil", q: "Computação na borda com redes 6G visa…", opts: ["Mais latência", "Ultra‑baixa latência e throughput", "Somente satélite", "Somente datacenter"], correct: 1, exp: "Arquiteturas edge + 6G priorizam latências sub‑ms." },
+        { title: "AWS", q: "Desafio central de óculos AR é…", opts: ["Peso/energia/óptica", "Planilhas", "Mainframes", "Teclados"], correct: 0, exp: "Equilíbrio entre bateria, FOV/brilho e conforto." },
+        { title: "Bosch", q: "Robôs assistivos focam…", opts: ["Mineração", "Apoio a pessoas/saúde", "Astrofísica", "Publicidade"], correct: 1, exp: "Ajudam mobilidade, cuidados e tarefas domésticas." },
+      ],
+      2025: [
+        { title: "Huawei", q: "Agentes autônomos orquestram…", opts: ["Prompts fixos", "Cadeias de tarefas e ferramentas", "Planilhas", "Apenas logs"], correct: 1, exp: "Planejam e chamam APIs/ferramentas automaticamente." },
+        { title: "Alphabet", q: "Vantagem de modelos on‑device é…", opts: ["Maior latência", "Menor dependência de nuvem", "Mais vazamento", "Menos controle"], correct: 1, exp: "Processo local reduz latência e risco de dados vazarem." },
+        { title: "ChatGPT", q: "Baterias de estado sólido prometem…", opts: ["Menor densidade", "Mais segurança e densidade", "Apenas custo maior", "Sem vantagens"], correct: 1, exp: "Eletrólito sólido melhora segurança e densidade." },
+        { title: "Sony", q: "Fusão de dados em IoT ajuda a…", opts: ["Piorar robustez", "Melhorar precisão e resiliência", "Somente comprimir", "Eliminar sensores"], correct: 1, exp: "Combinar sensores reduz ruído e falhas isoladas." },
+        { title: "Foxconn", q: "Computação em DNA explora…", opts: ["Reatores", "Processos bioquímicos", "Microwaves", "LANs"], correct: 1, exp: "Reações bioquímicas realizam operações lógicas/armazenamento." },
+        { title: "Broadcom", q: "Red teams de IA existem para…", opts: ["Vender anúncios", "Testar riscos/abusos", "Desligar provedores", "Gerar memes"], correct: 1, exp: "Avaliam falhas, jailbreaks e impactos adversos." },
+      ],
+    };
+
+    const EXTRA_QUIZ = {
+      2020: [
+        { q: "Qual técnica reduz consumo no celular?", opts: ["Quantização", "Oversampling", "Sharding", "Padding"], correct: 0, exp: "Int8/low‑bit reduz custo de inferência." },
+        { q: "Sensor útil para detecção de queda?", opts: ["Acelerômetro", "Barômetro", "Magnetômetro", "Fotodiodo"], correct: 0, exp: "Variações bruscas de aceleração indicam quedas." },
+        { q: "Ajustar poucas matrizes para personalizar chama‑se…", opts: ["LoRA/fine‑tuning parcial", "Dropout", "Pooling", "Beam Search"], correct: 0, exp: "LoRA injeta adaptadores leves." },
+      ],
+      2021: [
+        { q: "Para evitar alucinação, use…", opts: ["RAG (busca+geração)", "Aumentar batch", "RNN", "Trocar tokenizador"], correct: 0, exp: "RAG ancora respostas em fontes." },
+        { q: "Pipeline TTS moderno inclui…", opts: ["Síntese neural", "Ruído branco", "Chave RSA", "Ray tracing"], correct: 0, exp: "Redes geram espectrograma/áudio natural." },
+        { q: "Para modo hands‑free é essencial…", opts: ["Detecção de hotword", "Data lake", "MAC address", "Lei de Moore"], correct: 0, exp: "Wake word ativa o assistente sem toque." },
+      ],
+      2022: [
+        { q: "Emaranhamento é…", opts: ["Correlação clássica", "Correlação quântica não‑local", "Bug", "Ruído térmico"], correct: 1, exp: "Viola desigualdades de Bell." },
+        { q: "Medir qubits causa…", opts: ["Aceleração", "Colapso do estado", "Super‑resfriamento", "Amplificação"], correct: 1, exp: "Projeção na base destrói superposição." },
+        { q: "Tempo de coerência indica…", opts: ["Duração da superposição", "Tamanho do chip", "Clock", "RAM"], correct: 0, exp: "Quanto tempo o qubit mantém fase/estado." },
+      ],
+      2023: [
+        { q: "Threshold em QEC é…", opts: ["Limite de ruído para correção eficaz", "Tamanho de wafer", "Clock", "Curva ROC"], correct: 0, exp: "Abaixo do threshold, QEC escala bem." },
+        { q: "Grover requer…", opts: ["Oracle de marcação", "Kernel RBF", "Árvore B", "Cache L3"], correct: 0, exp: "Oracle identifica a solução para amplificação de amplitude." },
+        { q: "NISQ significa…", opts: ["Noisy Intermediate‑Scale Quantum", "New Internet Secure Queue", "Neural Integrated Shared Quantizer", "Non‑Ising Quantum"], correct: 0, exp: "Era de qubits ruidosos em número intermediário." },
+      ],
+      2024: [
+        { q: "Dispositivos AR usam SLAM para…", opts: ["Mapear e localizar em tempo real", "Comprimir vídeo", "Classificar e‑mails", "Minerar cripto"], correct: 0, exp: "Mapeamento/localização simultâneos." },
+        { q: "Chips neuromórficos são eficientes por…", opts: ["Processo por eventos", "128 bits", "Evitar paralelismo", "Criogenia"], correct: 0, exp: "Esparsidade e eventos reduzem consumo." },
+        { q: "Modelos multimodais combinam entradas via…", opts: ["Fusão/atenção cruzada", "Sort", "MD5", "DDL"], correct: 0, exp: "Camadas de fusão integram sinais." },
+      ],
+      2025: [
+        { q: "Agentes chamam ferramentas usando…", opts: ["APIs e planejadores", "SMTP", "GIFs", "FIFO"], correct: 0, exp: "Planos invocam APIs para executar tarefas." },
+        { q: "Privacidade on‑device melhora por…", opts: ["Processar localmente", "Enviar tudo à nuvem", "Usar cookies", "Imprimir logs"], correct: 0, exp: "Dados sensíveis não saem do aparelho." },
+        { q: "Baterias de estado sólido usam…", opts: ["Eletrólito sólido", "Chumbo líquido", "Água", "Ar"], correct: 0, exp: "Eletrólito sólido aumenta segurança." },
+      ],
+    };
+
+    function StartScreen({ onStart }) {
+      const [numPlayers, setNumPlayers] = React.useState(2);
+      const [names, setNames] = React.useState(["", "", "", ""]);
+
+      const handleNameChange = (idx, value) => {
+        setNames(prev => {
+          const arr = [...prev];
+          arr[idx] = value;
+          return arr;
+        });
+      };
+
+      const handleStart = () => {
+        const playerNames = names.slice(0, numPlayers);
+        if (playerNames.some(n => n.trim() === "")) {
+          alert("Preencha todos os nomes dos jogadores!");
+          return;
+        }
+        onStart(playerNames);
+      };
+
+      return (
+        <div className="relative flex h-screen w-full flex-col items-center justify-center bg-gradient-to-br from-blue-900 via-indigo-800 to-black text-white overflow-hidden">
+          {/* Nome do jogo */}
+          <h1 className="mb-8 text-5xl font-extrabold tracking-widest text-cyan-400 drop-shadow-lg">
+            Race Technology
+          </h1>
+
+          {/* Seleção de número de jogadores */}
+          <div className="mb-6 flex items-center gap-3">
+            <label className="text-lg font-semibold">Número de jogadores:</label>
+            <select
+              value={numPlayers}
+              onChange={e => setNumPlayers(parseInt(e.target.value))}
+              className="rounded-lg bg-black/20 px-3 py-1 text-white"
+            >
+              {[2, 3].map(n => <option key={n} value={n}>{n}</option>)}
+            </select>
+          </div>
+
+          {/* Inputs de nomes */}
+          <div className="mb-6 flex flex-col gap-3">
+            {Array.from({ length: numPlayers }).map((_, idx) => (
+              <input
+                key={idx}
+                type="text"
+                placeholder={`Nome do jogador ${idx + 1}`}
+                value={names[idx]}
+                onChange={e => handleNameChange(idx, e.target.value)}
+                className="rounded-xl border border-white/20 bg-black/30 px-4 py-2 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-cyan-400"
+              />
+            ))}
+          </div>
+
+          {/* Botão iniciar */}
+          <button
+            onClick={handleStart}
+            className="rounded-2xl bg-cyan-500 px-6 py-3 font-bold text-black hover:bg-cyan-400 transition-colors shadow-lg"
+          >
+            Começar Jogo
+          </button>
+
+          {/* Decoração futurista */}
+          <div className="absolute inset-0 pointer-events-none">
+            {Array.from({ length: 12 }).map((_, i) => (
+              <div
+                key={i}
+                className="absolute rounded-full border border-cyan-400/20"
+                style={{
+                  width: `${50 + i * 60}px`,
+                  height: `${50 + i * 60}px`,
+                  top: `${Math.sin(i) * 200 + 250}px`,
+                  left: `${Math.cos(i) * 200 + 250}px`,
+                }}
+              />
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+        
+    function buildCells() {
+      const cells = [];
+      const years = [2020, 2021, 2022, 2023, 2024, 2025];
+      years.forEach((year) => {
+        PROPERTY_SPEC[year].forEach((p) => {
+          cells.push({ year, theme: THEMES[year].name, themeColor: THEMES[year].color, ...p, owner: null, rent: 50, usedExtra: [] });
+        });
+      });
+      return cells; // 36
+    }
+
+    function Modal({ open, children, onClose, title, actionLabel = "Fechar" }) {
+      if (!open) return null;
+      return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+          <div className="relative z-10 w-[min(92vw,880px)] max-h-[80vh] overflow-auto rounded-2xl border border-white/10 bg-zinc-900 p-6 shadow-2xl">
+            {title && <h2 className="mb-4 text-xl font-semibold text-white">{title}</h2>}
+            <div className="prose prose-invert max-w-none">{children}</div>
+            <div className="mt-6 flex justify-end">
+              <button onClick={onClose} className="rounded-xl bg-white/10 px-4 py-2 text-white hover:bg-white/20">{actionLabel}</button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    function Dice({ value, rolling }) {
+      return (
+        <div className="relative h-16 w-16 select-none">
+          <div className={`absolute inset-0 grid place-items-center rounded-xl border border-white/15 bg-white/10 text-2xl font-bold text-white shadow-lg ${rolling ? "animate-[spin_0.6s_linear_infinite]" : ""}`}>{value}</div>
+        </div>
+      );
+    }
+
+    function HexTechBoard() {
+      const [cells, setCells] = useState(buildCells());
+      const total = cells.length;
+      const [started, setStarted] = useState(false);
+
+      const [players, setPlayers] = useState([
+        { id: 0, name: "Azul", color: "#4fc3f7", pos: 0, credits: 300, alive: true },
+        { id: 1, name: "Vermelho", color: "#ef5350", pos: 0, credits: 300, alive: true },
+        { id: 2, name: "Verde", color: "#66bb6a", pos: 0, credits: 300, alive: true },
+      ]);
+      const [current, setCurrent] = useState(0);
+      const [dice, setDice] = useState(1);
+      const [rolling, setRolling] = useState(false);
+
+      const [quizOpen, setQuizOpen] = useState(false);
+      const [quizCellIndex, setQuizCellIndex] = useState(null);
+      const [quizShuffled, setQuizShuffled] = useState([]);
+      const [quizTitle, setQuizTitle] = useState("");
+      const [quizMode, setQuizMode] = useState("acquire");
+      const [quizYear, setQuizYear] = useState(2020);
+
+      const [message, setMessage] = useState("");
+      const [messageOpen, setMessageOpen] = useState(false);
+      const [gameOver, setGameOver] = useState(null);
+
+      // --------------- Geometria do tabuleiro ---------------
+      const size = 860; const cx = size/2; const cy = size/2; const R = 315;
+      const vertices = useMemo(() => hexVertices(cx, cy, R), [cx, cy, R]);
+      const cellGeometry = useMemo(() => {
+        const centers = []; const rotations = []; const perSide = 6;
+        for (let s = 0; s < 6; s++) {
+          const a = vertices[s]; const b = vertices[(s + 1) % 6]; const ang = sideAngle(a, b);
+          for (let i = 0; i < perSide; i++) {
+            const margin = 0.001; // 6% de folga
+            const t = margin + (i + 0.5) * ((1 - 2 * margin) / perSide);
+            let x = lerp(a.x, b.x, t); let y = lerp(a.y, b.y, t);
+            const normal = ang - Math.PI / 2;
+            const baseIn = 60; const extra = (i % 2 === 0 ? -6 : -6) + (s % 2 === 0 ? -6 : -6);
+            x += Math.cos(normal) * (baseIn + extra); y += Math.sin(normal) * (baseIn + extra);
+            centers.push({ x, y, side: s }); rotations.push(ang);
+          }
+        }
+        return { centers, rotations };
+      }, [vertices]);
+
+      const nextAlive = (from) => { const n=players.length; let k=(from+1)%n; for(let i=0;i<n;i++){ if(players[k]?.alive) return k; k=(k+1)%n; } return from; };
+      const checkVictory = (list) => { const alive=list.filter(p=>p.alive); if(alive.length===1) return alive[0]; return list.find(p=>p.credits>=600 && p.alive) || null; };
+
+      // --------------- Fluxo da jogada ---------------
+      const handleRoll = () => {
+        if (rolling || quizOpen || messageOpen || gameOver) return;
+        const currentPlayer = players[current]; if (!currentPlayer.alive){ setCurrent(nextAlive(current)); return; }
+        setRolling(true); let ticks = 12 + Math.floor(Math.random()*6); let v = 1;
+        const timer = setInterval(()=>{ v=((v%6)+1); setDice(v); if(--ticks<=0){ clearInterval(timer); setRolling(false); resolveMove(v);} },80);
+      };
+
+      const summarizeAndNext = (text) => { setMessage(text); setMessageOpen(true); };
+      const closeMessageAndNext = () => { setMessageOpen(false); const w=checkVictory(players); if(w){ setGameOver(w); return;} setCurrent(nextAlive(current)); };
+
+      const openQuizAcquire = (cellIndex) => {
+        const cell = cells[cellIndex]; const ops = cell.opts.map((t,i)=>({t,i}));
+        for (let i=ops.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [ops[i],ops[j]]=[ops[j],ops[i]]; }
+        setQuizTitle(`${cell.title} — ${cell.theme} ${cell.year}`);
+        setQuizShuffled(ops); setQuizCellIndex(cellIndex); setQuizMode("acquire"); setQuizYear(cell.year); setQuizOpen(true);
+      };
+
+      const openQuizUpgrade = (cellIndex) => {
+        const cell = cells[cellIndex]; const bank = EXTRA_QUIZ[cell.year];
+        const available = bank.map((_,i)=>i).filter(i=>!cell.usedExtra.includes(i));
+        const pick = available.length ? available[Math.floor(Math.random()*available.length)] : Math.floor(Math.random()*bank.length);
+        const q = bank[pick]; const ops = q.opts.map((t,i)=>({t,i}));
+        for (let i=ops.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [ops[i],ops[j]]=[ops[j],ops[i]]; }
+        setQuizTitle(`${cell.title} — UPGRADE (${cell.theme} ${cell.year})`);
+        setQuizShuffled(ops); setQuizCellIndex(cellIndex); setQuizMode({ type: "upgrade", pick }); setQuizYear(cell.year); setQuizOpen(true);
+      };
+
+      const resolveMove = (steps) => {
+        setPlayers(prev => {
+          const arr = prev.map(p=>({ ...p })); const me = arr[current];
+          me.pos = (me.pos + steps) % total; const cell = cells[me.pos];
+          if (cell.owner == null) {
+            openQuizAcquire(me.pos);
+          }
+          else if (cell.owner === me.id) {
+            openQuizUpgrade(me.pos);
+          }
+          else {
+            const owner = arr.find(p=>p.id===cell.owner); const amount = Math.min(cell.rent, me.credits);
+            me.credits -= amount; if (owner) owner.credits += amount; if (me.credits<=0) me.alive=false;
+            summarizeAndNext(`Pagamento de ${amount} créditos ao proprietário ${owner?.name}. (Aluguel atual: ${cell.rent})` + (!me.alive ? "\n\nVocê foi eliminado por ficar sem créditos." : ""));
+          }
+          return arr;
+        });
+      };
+
+      const answerQuiz = (idxChosen) => {
+        if (quizCellIndex == null) return; const cell = cells[quizCellIndex];
+        if (quizMode === "acquire") {
+          const chosen = quizShuffled[idxChosen].i; const ok = chosen === cell.correct;
+          if (ok) {
+            setCells(prev=>prev.map((c,i)=> i===quizCellIndex ? { ...c, owner: players[current].id } : c));
+            setQuizOpen(false); summarizeAndNext(`Resposta correta! Você adquiriu ${cell.title}.\nAluguel inicial: ${cell.rent} créditos.`);
+          } else {
+            const correctLetter = String.fromCharCode(65 + cell.correct);
+            const explanation = cell.exp || "";
+            setQuizOpen(false); summarizeAndNext(`Resposta incorreta. Alternativa correta: ${correctLetter} — ${cell.opts[cell.correct]}.\nPor quê? ${explanation}`);
+          }
+          return;
+        }
+        if (typeof quizMode === "object" && quizMode.type === "upgrade") {
+          const bank = EXTRA_QUIZ[quizYear]; const q = bank[quizMode.pick];
+          const chosen = quizShuffled[idxChosen].i; const ok = chosen === q.correct;
+          if (ok) {
+            setCells(prev=>prev.map((c,i)=>{
+              if (i !== quizCellIndex) return c;
+              const used = c.usedExtra.includes(quizMode.pick) ? c.usedExtra : [...c.usedExtra, quizMode.pick];
+              return { ...c, rent: Math.min(150, c.rent + 50), usedExtra: used };
+            }));
+            setQuizOpen(false); const newRent = Math.min(150, cell.rent + 50);
+            summarizeAndNext(`Correto! Aluguel de **${cell.title}** aumentado para ${newRent} créditos (máx. 150).`);
+          } else {
+            const correctLetter = String.fromCharCode(65 + q.correct);
+            const explanation = q.exp || "";
+            setQuizOpen(false); summarizeAndNext(`Resposta incorreta. Alternativa correta: ${correctLetter} — ${q.opts[q.correct]}\nPor quê? ${explanation}`);
+          }
+        }
+      };
+
+      // --------------- Render ---------------
+
+      if (!started) {
+        return <StartScreen onStart={(playerNames) => {
+          // Inicializa jogadores com os nomes escolhidos
+          setPlayers(prev => prev.slice(0, playerNames.length).map((p,i)=>({
+            ...p,
+            name: playerNames[i],
+            pos: 0,
+            credits: 300,
+            alive: true
+          })));
+          setStarted(true);
+        }} />;
+      }
+
+      const bgGradient = "bg-[radial-gradient(circle_at_50%_30%,rgba(59,130,246,.25),rgba(17,24,39,.6))]";
+      return (
+        
+        <div className={`min-h-screen w-full ${bgGradient} text-white antialiased`}>
+          <div className="mx-auto max-w-6xl p-4">
+            <header className="mb-3 flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h1 className="text-2xl font-bold">Race Technology — Evolução da Computação (2020–2025)</h1>
+                <p className="text-sm text-white/70">Início: 300 • Aluguel 50→150 • Vence 600+ ou último vivo.</p>
+              </div>
+              <div className="flex items-center gap-3">
+                <Dice value={dice} rolling={rolling} />
+                <button onClick={handleRoll} disabled={rolling || quizOpen || messageOpen || !!gameOver} className="rounded-xl bg-indigo-500/90 px-4 py-2 font-semibold shadow hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-60">Rolar Dado</button>
+              </div>
+            </header>
+
+            {/* Painel de jogadores */}
+            <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {players.map((p,i)=> (
+                <div key={p.id} className={`${p.alive ? "border-white/15 bg-white/5" : "border-red-500/30 bg-red-500/10"} ${current===i ? "ring-2 ring-indigo-400" : ""} rounded-2xl border p-3`}>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2"><span className="inline-block h-3 w-3 rounded-full" style={{background:p.color}}></span><h3 className="font-semibold">{p.name}</h3></div>
+                    <div className="text-sm opacity-80">{p.alive?"Em jogo":"Eliminado"}</div>
+                  </div>
+                  <div className="mt-1 text-sm opacity-90">Créditos: {p.credits}</div>
+                  <div className="text-xs opacity-60">Posição: {p.pos+1} / {total}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Tabuleiro */}
+            <div className="mx-auto overflow-hidden rounded-3xl border border-white/10 bg-black/40 p-4 shadow-2xl">
+              <svg viewBox={`0 0 ${size} ${size}`} width="100%" height="100%" className="mx-auto">
+                <defs>
+                  <radialGradient id="g" cx="50%" cy="50%" r="60%">
+                    <stop offset="0%" stopColor="#0ea5e9" stopOpacity="0.15" />
+                    <stop offset="100%" stopColor="#111827" stopOpacity="0.8" />
+                  </radialGradient>
+                </defs>
+                <rect x="0" y="0" width={size} height={size} fill="url(#g)" />
+
+                {/* Centro ilustrativo */}
+                <g opacity="0.6">
+                  <circle cx={size/2} cy={size/2} r={110} fill="#0ea5e9" opacity="0.08" />
+                  <rect x={size/2 - 36} y={size/2 - 36} width={72} height={72} rx={10} fill="#0ea5e9" opacity="0.15" />
+                  {Array.from({length:16}).map((_,k)=>{ const ang=(k/16)*TAU, r1=120, r2=260; return <line key={k} x1={size/2+r1*Math.cos(ang)} y1={size/2+r1*Math.sin(ang)} x2={size/2+r2*Math.cos(ang)} y2={size/2+r2*Math.sin(ang)} stroke="#38bdf8" strokeOpacity="0.12" /> })}
+                </g>
+
+                {/* Hexágono externo */}
+                <polygon points={hexVertices(size/2,size/2,R).map(v=>`${v.x},${v.y}`).join(" ")} fill="none" stroke="#94a3b8" strokeOpacity="0.35" strokeWidth="2" />
+                
+                {/* Números dos anos alinhados aos lados do hexágono */}
+                  {[2020, 2021, 2022, 2023, 2024, 2025].map((year, i) => {
+                    const verts = hexVertices(cx, cy, R);      // pega vértices
+                    const a = verts[i];                        // vértice inicial do lado
+                    const b = verts[(i + 1) % 6];              // vértice final do lado
+                    const x = (a.x + b.x) / 2;                 // ponto médio x
+                    const y = (a.y + b.y) / 2;                 // ponto médio y
+
+                    // desloca o número um pouco para fora do hexágono
+                    const ang = Math.atan2(b.y - a.y, b.x - a.x); 
+                    const normal = ang + Math.PI / 2; 
+                    const offset = 35; // ajuste da distância para fora
+                    const px = x + Math.cos(normal) * offset;
+                    const py = y + Math.sin(normal) * offset;
+
+                    return (
+                      <text
+                        key={year}
+                        x={px}
+                        y={py}
+                        textAnchor="middle"
+                        alignmentBaseline="middle"
+                        fontSize="20"
+                        fontWeight="bold"
+                        fill="white"
+                        stroke="#111"
+                        strokeWidth="5"
+                        paintOrder="stroke"
+                        style={{ fontFamily: "sans-serif" }}
+                      >
+                        {year}
+                      </text>
+                    );
+                  })}
+
+                {/* Casas */}
+                {cells.map((cell, idx) => {
+                  const c = cellGeometry.centers[idx]; const ang = cellGeometry.rotations[idx]; const w=100, h=55; const x=c.x-w/2; const y=c.y-h/2; const owner = cell.owner!=null ? players.find(p=>p.id===cell.owner) : null;
+                  return (
+                    <g key={idx} transform={`rotate(${(ang * 180) / Math.PI + 90}, ${c.x}, ${c.y})`}>
+                    <rect
+                      x={x}
+                      y={y}
+                      width={w}
+                      height={h}
+                      rx={10}
+                      fill={owner ? owner.color : "#0b1020"}
+                      fillOpacity={owner ? 0.35 : 1}
+                      stroke={cell.themeColor}
+                      strokeOpacity={0.9}
+                      strokeWidth={owner ? 3 : 1}
+                    />
+
+                    {/* Se for 2020, 2024 ou 2025 → gira os textos 180° */}
+                    <g transform={(cell.year === 2020 || cell.year === 2024 || cell.year === 2025)
+                                    ? `rotate(180, ${c.x}, ${c.y})`
+                                    : ""}>
+                      <text
+                        x={c.x}
+                        y={c.y - 8}
+                        textAnchor="middle"
+                        alignmentBaseline="central"
+                        className="text-[14px] font-bold tracking-tight" // tamanho da letra titulo
+                        fill="#fff"
+                        fillOpacity="0.8"
+                      >
+                        {cell.title.slice(0, 16)}{cell.title.length > 16 ? "..." : ""}
+                      </text>
+                      <text
+                        x={c.x}
+                        y={c.y + 12}
+                        textAnchor="middle"
+                        alignmentBaseline="central"
+                        className="text-[12px] tracking-tight" // tamanho da letra aluguel
+                        fill="#fff"
+                        fillOpacity="0.8"
+                      >
+                        Aluguel: {cell.rent}
+                      </text>
+                    </g>
+                  </g>
+                                    );
+                })}
+
+                {/* Pinos dos jogadores */}
+                {players.filter(p=>p.alive).map(p=>{
+                  const c = cellGeometry.centers[p.pos];
+                  const ang = cellGeometry.rotations[p.pos];
+                  const dx = Math.cos(ang + Math.PI/2) * (p.id-1) * 8;
+                  const dy = Math.sin(ang + Math.PI/2) * (p.id-1) * 8;
+                  return <circle key={p.id} cx={c.x+dx} cy={c.y+dy} r="6" fill={p.color} stroke="#111" strokeWidth="1.5" className="transition-all duration-300 ease-in-out" />
+                })}
+              </svg>
+            </div>
+
+            <Modal open={quizOpen} onClose={()=>setQuizOpen(false)} title={quizTitle} actionLabel="Cancelar" >
+              <h3 className="text-xl font-semibold mb-3">{quizMode === "acquire" ? cells[quizCellIndex]?.q : EXTRA_QUIZ[quizYear][quizMode.pick]?.q}</h3>
+              <div className="space-y-2">
+                {quizShuffled.map((opt,idx)=>(
+                  <button key={idx} onClick={()=>answerQuiz(idx)} className="w-full text-left rounded-xl p-3 bg-white/5 hover:bg-white/10 transition-colors">
+                    <span className="font-mono text-white/50">{String.fromCharCode(65 + idx)}.</span> {opt.t}
+                  </button>
+                ))}
+              </div>
+            </Modal>
+
+            <Modal open={messageOpen} onClose={closeMessageAndNext} title="Aviso">
+              <p>{message.split('\\n').map((line,i)=><React.Fragment key={i}>{line}<br/></React.Fragment>)}</p>
+            </Modal>
+
+            <Modal open={!!gameOver} onClose={()=>{}} title="Fim de Jogo">
+              <div className="text-center">
+                <p className="text-3xl font-bold mb-2">Parabéns!</p>
+                <p className="text-xl">O jogador <span style={{color:gameOver?.color}} className="font-bold">{gameOver?.name}</span> venceu o jogo!</p>
+              </div>
+            </Modal>
+
+          </div>
+        </div>
+      );
+    }
+
+    // Render
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<HexTechBoard />);
+  </script>
+</body>
+</html>
