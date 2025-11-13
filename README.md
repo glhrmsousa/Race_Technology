@@ -11,7 +11,7 @@ O Race Technology é um jogo de tabuleiro interativo ambientado na evolução da
 Inspirado no famoso jogo de tabuleiro, Banco Imobiliário, cada jogador percorre um percurso cheio de empresas, tecnologias e avanços reais, respondendo perguntas, adquirindo propriedades e administrando créditos para continuar na partida. 
 O jogo contribui para o desenvolvimento de diversas habilidades, incluindo conhecimentos sobre a história da computação, gestão de recursos, raciocínio lógico e outras competências essenciais ao pensamento computacional.
 
-Tudo isso rodando **em um único arquivo** — o nosso `index.html`.
+Tudo isso rodando **em um único arquivo** — o nosso `jogo.html`.
 
 ---
 
@@ -72,12 +72,12 @@ Esse projeto tem nossa personalidade e carrega consigo nossa paixão por jogos.
 - **SVG**  
 - Lógica em JavaScript direto no navegador
 
---
+---
 
 ## ▶️ Como executar
 
 1. Clone o repositório.
-2. Abra o arquivo `index.html` no navegador.  
+2. Abra o arquivo `jogo.html` no navegador.  
 3. Jogue!
 
 > Se algum navegador impedir o carregamento do Babel, você pode rodar via servidor local:
